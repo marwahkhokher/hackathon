@@ -1,11 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sparkles, FlaskConical, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Sparkles,
+  FlaskConical,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ArrowDown,
+  Zap,
+} from "lucide-react";
 import { Stepper, type Stage } from "@/components/Stepper";
 import { HypothesisInput } from "@/components/HypothesisInput";
 import { NoveltyCard } from "@/components/NoveltyCard";
 import { PlanView } from "@/components/PlanView";
+import { Spotlight } from "@/components/Spotlight";
 import type {
   ExperimentPlan,
   FeedbackEntry,
@@ -30,15 +40,18 @@ export default function Page() {
   const [s, setS] = useState<PipelineState>(initial);
   const [regenBusy, setRegenBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const resultRef = useRef<HTMLDivElement | null>(null);
 
   const run = useCallback(async (hypothesis: string) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setS({ hypothesis, stage: "intent", streamLen: 0 });
+    requestAnimationFrame(() =>
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
 
     try {
-      // 1) intent
       const intentRes = await fetch("/api/intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,7 +65,6 @@ export default function Page() {
       const { intent } = (await intentRes.json()) as { intent: ScientificIntent };
       setS((prev) => ({ ...prev, intent, stage: "novelty" }));
 
-      // 2) novelty
       const novRes = await fetch("/api/novelty", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,7 +78,6 @@ export default function Page() {
       const { novelty } = (await novRes.json()) as { novelty: NoveltyResult };
       setS((prev) => ({ ...prev, novelty, stage: "plan" }));
 
-      // 3) plan (streaming SSE)
       await streamPlan({ hypothesis, intent, novelty, ctrl, onState: setS });
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
@@ -86,6 +97,9 @@ export default function Page() {
       stage: "done",
       streamLen: 0,
     });
+    requestAnimationFrame(() =>
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
   }, []);
 
   const handleSavePlan = useCallback(
@@ -136,92 +150,198 @@ export default function Page() {
 
   return (
     <main className="relative mx-auto max-w-6xl px-4 pb-24 pt-8 sm:pt-12">
-      <header className="mb-8 flex flex-col items-start justify-between gap-3 sm:mb-12 sm:flex-row sm:items-center">
+      {/* Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="mb-10 flex flex-col items-start justify-between gap-3 sm:mb-14 sm:flex-row sm:items-center"
+      >
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-ink-700 bg-ink-900 shadow-glow">
-            <FlaskConical className="h-5 w-5 text-accent-300" />
+          <div className="relative">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-violet-500/40 to-cyan-400/40 blur-md" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-ink-950/80 shadow-glow">
+              <FlaskConical className="h-5 w-5 text-violet-200" />
+            </div>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-ink-300">Fulcrum × Hack-Nation</div>
-            <div className="text-lg font-semibold text-ink-50">The AI Scientist</div>
+            <div className="text-[10px] uppercase tracking-[0.24em] text-ink-300">
+              Fulcrum × Hack-Nation
+            </div>
+            <div className="font-display text-lg font-semibold text-ink-50">The AI Scientist</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-ghost" onClick={handleSeed} type="button">
-            <Sparkles className="h-4 w-4" /> Load demo plan
-          </button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            className="btn-ghost"
+            onClick={handleSeed}
+            type="button"
+          >
+            <Sparkles className="h-4 w-4 text-violet-300" /> Load demo plan
+          </motion.button>
           <a className="btn-ghost" href="/api/plans" target="_blank" rel="noreferrer">
             Plans API
           </a>
         </div>
-      </header>
+      </motion.header>
 
-      <section className="grid-bg mb-8 rounded-3xl border border-ink-700 p-6 sm:p-10">
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink-50 sm:text-5xl">
-          From a scientific question to a runnable experiment plan — in seconds.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base text-ink-200 sm:text-lg">
-          Convert a natural-language hypothesis into a full operational plan a real lab could pick
-          up on Monday. Protocol, materials with catalog numbers, budget, timeline, validation —
-          grounded in real suppliers and prior literature.
-        </p>
-        <div className="mt-6">
-          <Stepper stage={s.stage} />
+      {/* Hero */}
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative mb-10 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] p-6 sm:mb-14 sm:p-12"
+      >
+        {/* hero gradient ring */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
+
+        <div className="grid items-end gap-8 sm:grid-cols-[1fr_auto]">
+          <div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.5 }}
+              className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-ink-200"
+            >
+              <Zap className="h-3.5 w-3.5 text-violet-300" />
+              From hypothesis to runnable plan in seconds
+            </motion.div>
+            <h1 className="font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
+              <span className="text-gradient">From a scientific question</span>
+              <br />
+              <span className="text-gradient-accent">to a runnable experiment plan.</span>
+            </h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35, duration: 0.6 }}
+              className="mt-5 max-w-2xl text-base leading-relaxed text-ink-200 sm:text-lg"
+            >
+              Convert a natural-language hypothesis into a full operational plan a real lab could
+              pick up on Monday — protocol, materials with catalog numbers, budget, timeline, and
+              validation, grounded in real suppliers and prior literature.
+            </motion.p>
+          </div>
+
+          {/* floating stat card */}
+          <motion.div
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="hidden sm:block"
+          >
+            <Spotlight tilt className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+              <div className="label">Pipeline latency</div>
+              <div className="mt-1 font-display text-3xl font-semibold text-gradient-accent">≈ 8s</div>
+              <div className="text-xs text-ink-400">intent → QC → streamed plan</div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px] text-ink-300">
+                <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                  <div className="font-display text-base text-ink-50">Zod</div>
+                  schemas
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                  <div className="font-display text-base text-ink-50">SSE</div>
+                  streaming
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                  <div className="font-display text-base text-ink-50">RAG</div>
+                  feedback
+                </div>
+              </div>
+            </Spotlight>
+          </motion.div>
         </div>
-      </section>
 
-      <section className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.55, duration: 0.6 }}
+          className="mt-8"
+        >
+          <Stepper stage={s.stage} />
+        </motion.div>
+      </motion.section>
+
+      <section ref={resultRef} className="space-y-6">
         <HypothesisInput
           onSubmit={run}
           busy={s.stage === "intent" || s.stage === "novelty" || s.stage === "plan"}
           initial={s.hypothesis}
         />
 
-        {s.stage === "error" && s.error && (
-          <div className="card flex items-start gap-3 p-4 text-rose-300">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div className="text-sm">
-              <div className="font-medium">Something went wrong</div>
-              <div className="text-rose-200/90">{s.error}</div>
-              <div className="mt-2 text-xs text-ink-300">
-                Tip: ensure <code>LLM_API_KEY</code> and <code>TAVILY_API_KEY</code> are set, or
-                click <strong>Load demo plan</strong> to explore the UI without keys.
+        <AnimatePresence>
+          {s.stage === "error" && s.error && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="card flex items-start gap-3 p-4 text-rose-300"
+            >
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="text-sm">
+                <div className="font-medium">Something went wrong</div>
+                <div className="text-rose-200/90">{s.error}</div>
+                <div className="mt-2 text-xs text-ink-300">
+                  Tip: ensure <code>LLM_API_KEY</code> and <code>TAVILY_API_KEY</code> are set, or
+                  click <strong>Load demo plan</strong> to explore the UI without keys.
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {s.intent && (
-          <div className="card p-6">
-            <div className="mb-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-accent-300" />
-              <span className="label">Structured intent</span>
-              {(s.stage === "novelty" || s.stage === "plan") && (
-                <Loader2 className="ml-auto h-4 w-4 animate-spin text-ink-400" />
-              )}
-              {s.stage === "done" && <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-400" />}
-            </div>
-            <IntentPills intent={s.intent} />
-          </div>
-        )}
+        <AnimatePresence>
+          {s.intent && (
+            <motion.div
+              key="intent-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.45 }}
+              className="card p-6"
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-violet-300" />
+                <span className="label">Structured intent</span>
+                {(s.stage === "novelty" || s.stage === "plan") && (
+                  <Loader2 className="ml-auto h-4 w-4 animate-spin text-ink-400" />
+                )}
+                {s.stage === "done" && (
+                  <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-400" />
+                )}
+              </div>
+              <IntentPills intent={s.intent} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {s.novelty && <NoveltyCard novelty={s.novelty} />}
+        <AnimatePresence>{s.novelty && <NoveltyCard novelty={s.novelty} />}</AnimatePresence>
 
-        {s.stage === "plan" && !s.stored && <StreamingHint len={s.streamLen} />}
+        <AnimatePresence>
+          {s.stage === "plan" && !s.stored && <StreamingHint len={s.streamLen} />}
+        </AnimatePresence>
 
-        {s.stored && (
-          <PlanView
-            stored={s.stored}
-            onSavePlan={handleSavePlan}
-            onSubmitFeedback={handleFeedback}
-            onRegenerate={handleRegenerate}
-            regenBusy={regenBusy}
-          />
-        )}
+        <AnimatePresence>
+          {s.stored && (
+            <PlanView
+              key={`plan-${s.stored.id}-v${s.stored.version}`}
+              stored={s.stored}
+              onSavePlan={handleSavePlan}
+              onSubmitFeedback={handleFeedback}
+              onRegenerate={handleRegenerate}
+              regenBusy={regenBusy}
+            />
+          )}
+        </AnimatePresence>
       </section>
 
-      <footer className="mt-12 text-center text-xs text-ink-400">
-        Built for Hack-Nation × World Bank Youth Summit · Fulcrum Science · 2026
+      <footer className="mt-16 flex flex-col items-center gap-2 text-center text-xs text-ink-400">
+        <div className="flex items-center gap-1.5">
+          <span className="h-px w-10 bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" />
+          Built for Hack-Nation × World Bank Youth Summit · Fulcrum Science · 2026
+          <span className="h-px w-10 bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
+        </div>
       </footer>
     </main>
   );
@@ -238,11 +358,17 @@ function IntentPills({ intent }: { intent: ScientificIntent }) {
       <Pair k="Threshold" v={intent.outcome.threshold ?? "—"} />
       <div className="sm:col-span-2">
         <div className="label">Keywords</div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {intent.keywords.map((k) => (
-            <span key={k} className="pill">
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {intent.keywords.map((k, i) => (
+            <motion.span
+              key={k}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.025 * i, duration: 0.3 }}
+              className="pill"
+            >
               {k}
-            </span>
+            </motion.span>
           ))}
         </div>
       </div>
@@ -261,11 +387,17 @@ function Pair({ k, v }: { k: string; v: string }) {
 
 function StreamingHint({ len }: { len: number }) {
   return (
-    <div className="card flex items-center gap-3 p-4 text-sm text-ink-200">
-      <Loader2 className="h-4 w-4 animate-spin text-accent-300" />
-      Drafting protocol, sourcing materials, costing the run…
-      <span className="ml-auto font-mono text-xs text-ink-400">{len.toLocaleString()} chars</span>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="scan-rail card flex items-center gap-3 p-4 text-sm text-ink-200"
+    >
+      <Loader2 className="h-4 w-4 animate-spin text-violet-300" />
+      <span className="typing-caret">Drafting protocol, sourcing materials, costing the run</span>
+      <ArrowDown className="ml-auto h-4 w-4 animate-bounce text-ink-400" />
+      <span className="font-mono text-xs text-ink-400">{len.toLocaleString()} chars</span>
+    </motion.div>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion, LayoutGroup } from "framer-motion";
 import {
   Beaker,
   ClipboardList,
@@ -14,9 +15,13 @@ import {
   Save,
   Star,
   Loader2,
+  RefreshCcw,
+  X,
 } from "lucide-react";
 import type { ExperimentPlan, FeedbackEntry, StoredPlan } from "@/lib/schemas";
 import { cn, fmtUSD } from "@/lib/utils";
+import { AnimatedNumber } from "./AnimatedNumber";
+import { Spotlight } from "./Spotlight";
 
 type Section =
   | "summary"
@@ -39,7 +44,7 @@ const TABS: { id: Section; label: string; icon: React.ComponentType<{ className?
   { id: "validation", label: "Validation", icon: ShieldCheck },
   { id: "personnel", label: "Personnel", icon: Users },
   { id: "risks", label: "Risks", icon: AlertOctagon },
-  { id: "why", label: "Why this plan", icon: Lightbulb },
+  { id: "why", label: "Why", icon: Lightbulb },
 ];
 
 interface PlanViewProps {
@@ -68,19 +73,29 @@ export function PlanView({
   );
 
   return (
-    <div className="card overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      className="card overflow-hidden"
+    >
       {/* header */}
-      <div className="flex flex-col gap-4 border-b border-ink-700 p-6 sm:flex-row sm:items-start sm:justify-between">
+      <div className="relative flex flex-col gap-4 border-b border-white/10 p-6 sm:flex-row sm:items-start sm:justify-between">
+        {/* subtle gradient header glow */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
+
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="pill">v{stored.version}</span>
-            <span className="pill">{plan.intent.domain.replace("_", " ")}</span>
+            <span className="pill capitalize">{plan.intent.domain.replace("_", " ")}</span>
             {stored.novelty?.status && (
               <span className="pill capitalize">{stored.novelty.status.replace(/_/g, " ")}</span>
             )}
           </div>
-          <h2 className="mt-2 text-xl font-semibold text-ink-50 sm:text-2xl">{plan.title}</h2>
-          <p className="mt-1 text-sm text-ink-200">{plan.summary}</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink-50 sm:text-3xl">
+            {plan.title}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-200">{plan.summary}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {editing ? (
@@ -92,7 +107,7 @@ export function PlanView({
                   setEditing(false);
                 }}
               >
-                Cancel
+                <X className="h-4 w-4" /> Cancel
               </button>
               <button
                 className="btn-primary"
@@ -109,12 +124,12 @@ export function PlanView({
               <button className="btn-ghost" onClick={() => setEditing(true)}>
                 <Pencil className="h-4 w-4" /> Edit plan
               </button>
-              <button
-                className="btn-primary"
-                onClick={onRegenerate}
-                disabled={regenBusy}
-              >
-                {regenBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />}
+              <button className="btn-primary" onClick={onRegenerate} disabled={regenBusy}>
+                {regenBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="h-4 w-4" />
+                )}
                 Regenerate from feedback
               </button>
             </>
@@ -122,76 +137,156 @@ export function PlanView({
         </div>
       </div>
 
-      {/* metric strip */}
-      <div className="grid grid-cols-2 gap-px bg-ink-700 sm:grid-cols-4">
-        <Metric label="Budget" value={fmtUSD(plan.budget.total_usd)} sub={`+${plan.budget.contingency_pct}% contingency`} />
-        <Metric label="Timeline" value={`${plan.timeline.total_weeks} weeks`} sub={`${plan.timeline.phases.length} phases`} />
-        <Metric label="Materials" value={`${plan.materials.length} line items`} sub={fmtUSD(totalMaterials)} />
-        <Metric label="Validation" value={`${plan.validation.length} criteria`} sub={`${plan.controls.length} controls`} />
+      {/* metric strip with animated counters */}
+      <div className="grid grid-cols-2 gap-px bg-white/[0.06] sm:grid-cols-4">
+        <Metric
+          label="Budget"
+          big={
+            <AnimatedNumber
+              value={plan.budget.total_usd}
+              format={(n) => fmtUSD(Math.round(n))}
+            />
+          }
+          sub={`+${plan.budget.contingency_pct}% contingency`}
+          accent="violet"
+        />
+        <Metric
+          label="Timeline"
+          big={
+            <>
+              <AnimatedNumber value={plan.timeline.total_weeks} /> weeks
+            </>
+          }
+          sub={`${plan.timeline.phases.length} phases`}
+          accent="cyan"
+        />
+        <Metric
+          label="Materials"
+          big={
+            <>
+              <AnimatedNumber value={plan.materials.length} /> items
+            </>
+          }
+          sub={fmtUSD(totalMaterials)}
+          accent="teal"
+        />
+        <Metric
+          label="Validation"
+          big={
+            <>
+              <AnimatedNumber value={plan.validation.length} /> criteria
+            </>
+          }
+          sub={`${plan.controls.length} controls`}
+          accent="violet"
+        />
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b border-ink-700 px-2">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm transition",
-                tab === t.id
-                  ? "border-accent-500 text-ink-50"
-                  : "border-transparent text-ink-300 hover:text-ink-100"
-              )}
-            >
-              <Icon className="h-4 w-4" /> {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <LayoutGroup id="plan-tabs">
+        <div className="flex gap-1 overflow-x-auto border-b border-white/10 px-2">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-2 px-3 py-3 text-sm transition",
+                  active ? "text-ink-50" : "text-ink-300 hover:text-ink-100"
+                )}
+              >
+                <Icon className={cn("h-4 w-4 transition", active && "text-violet-300")} />
+                {t.label}
+                {active && (
+                  <motion.span
+                    layoutId="active-tab"
+                    className="absolute inset-x-2 -bottom-px h-[2px] rounded-full"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(139,92,246,0.95), rgba(34,211,238,0.95))",
+                      boxShadow: "0 0 12px rgba(139,92,246,0.6)",
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </LayoutGroup>
 
       {/* body */}
       <div className="p-6">
-        {tab === "summary" && <SummaryView plan={plan} />}
-        {tab === "protocol" && (
-          <ProtocolView
-            plan={plan}
-            editing={editing}
-            onChange={(p) => setDraft({ ...draft, ...p })}
-          />
-        )}
-        {tab === "materials" && (
-          <MaterialsView
-            plan={plan}
-            editing={editing}
-            onChange={(p) => setDraft({ ...draft, ...p })}
-          />
-        )}
-        {tab === "budget" && (
-          <BudgetView plan={plan} editing={editing} onChange={(p) => setDraft({ ...draft, ...p })} />
-        )}
-        {tab === "timeline" && <TimelineView plan={plan} />}
-        {tab === "validation" && <ValidationView plan={plan} />}
-        {tab === "personnel" && <PersonnelView plan={plan} />}
-        {tab === "risks" && <RisksView plan={plan} />}
-        {tab === "why" && <WhyView plan={plan} />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {tab === "summary" && <SummaryView plan={plan} />}
+            {tab === "protocol" && (
+              <ProtocolView
+                plan={plan}
+                editing={editing}
+                onChange={(p) => setDraft({ ...draft, ...p })}
+              />
+            )}
+            {tab === "materials" && (
+              <MaterialsView
+                plan={plan}
+                editing={editing}
+                onChange={(p) => setDraft({ ...draft, ...p })}
+              />
+            )}
+            {tab === "budget" && (
+              <BudgetView plan={plan} editing={editing} onChange={(p) => setDraft({ ...draft, ...p })} />
+            )}
+            {tab === "timeline" && <TimelineView plan={plan} />}
+            {tab === "validation" && <ValidationView plan={plan} />}
+            {tab === "personnel" && <PersonnelView plan={plan} />}
+            {tab === "risks" && <RisksView plan={plan} />}
+            {tab === "why" && <WhyView plan={plan} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <FeedbackPanel
-        defaultSection={tab === "why" || tab === "summary" ? "general" : (tab as FeedbackEntry["section"])}
+        defaultSection={
+          tab === "why" || tab === "summary" ? "general" : (tab as FeedbackEntry["section"])
+        }
         onSubmit={onSubmitFeedback}
         plan={plan}
       />
-    </div>
+    </motion.div>
   );
 }
 
-function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Metric({
+  label,
+  big,
+  sub,
+  accent = "violet",
+}: {
+  label: string;
+  big: React.ReactNode;
+  sub?: string;
+  accent?: "violet" | "cyan" | "teal";
+}) {
+  const accentClass =
+    accent === "cyan"
+      ? "from-cyan-400/40 to-cyan-400/0"
+      : accent === "teal"
+      ? "from-teal-400/40 to-teal-400/0"
+      : "from-violet-400/40 to-violet-400/0";
   return (
-    <div className="bg-ink-900 px-5 py-4">
+    <div className="relative bg-ink-950/80 px-5 py-4">
+      <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r", accentClass)} />
       <div className="label">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-ink-50">{value}</div>
+      <div className="mt-1 font-display text-xl font-semibold text-ink-50 sm:text-2xl">{big}</div>
       {sub && <div className="text-xs text-ink-400">{sub}</div>}
     </div>
   );
@@ -200,28 +295,28 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
 function SummaryView({ plan }: { plan: ExperimentPlan }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="rounded-xl border border-ink-700 p-4">
+      <Spotlight className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="label">Intent</div>
-        <div className="mt-2 space-y-1 text-sm">
+        <div className="mt-2 space-y-1.5 text-sm">
           <KV k="Intervention" v={plan.intent.intervention} />
           <KV k="Comparator" v={plan.intent.comparator} />
           <KV k="Model system" v={plan.intent.model_system} />
           <KV k="Outcome" v={`${plan.intent.outcome.name} — ${plan.intent.outcome.metric}`} />
           {plan.intent.outcome.threshold && <KV k="Threshold" v={plan.intent.outcome.threshold} />}
         </div>
-      </div>
-      <div className="rounded-xl border border-ink-700 p-4">
+      </Spotlight>
+      <Spotlight className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
         <div className="label">Controls</div>
-        <ul className="mt-2 space-y-1 text-sm">
+        <ul className="mt-2 space-y-1.5 text-sm">
           {plan.controls.map((c, i) => (
-            <li key={i}>
-              <span className="pill mr-2 capitalize">{c.type}</span>
-              {c.description}
+            <li key={i} className="flex items-start gap-2">
+              <span className="pill mt-0.5 capitalize">{c.type}</span>
+              <span className="text-ink-100">{c.description}</span>
             </li>
           ))}
         </ul>
-      </div>
-      <div className="rounded-xl border border-ink-700 p-4 sm:col-span-2">
+      </Spotlight>
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 sm:col-span-2">
         <div className="label">Assumptions</div>
         <ul className="mt-2 list-disc pl-5 text-sm text-ink-100">
           {plan.assumptions.map((a, i) => (
@@ -254,9 +349,17 @@ function ProtocolView({
   return (
     <ol className="space-y-3">
       {plan.protocol.map((step, i) => (
-        <li key={step.id} className="rounded-xl border border-ink-700 bg-ink-900/40 p-4">
+        <motion.li
+          key={step.id}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.04 * i, duration: 0.35 }}
+          className="group relative rounded-xl border border-white/10 bg-white/[0.02] p-4 transition hover:border-violet-400/30"
+        >
+          {/* step rail */}
+          <div className="absolute left-0 top-4 bottom-4 w-px bg-gradient-to-b from-violet-400/40 via-cyan-400/30 to-transparent opacity-0 transition group-hover:opacity-100" />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="pill">{step.id}</span>
+            <span className="pill border-violet-400/30 bg-violet-500/10 text-violet-200">{step.id}</span>
             <span className="pill">{step.phase}</span>
             <span className="pill">{step.duration}</span>
             {editing ? (
@@ -270,7 +373,7 @@ function ProtocolView({
                 }}
               />
             ) : (
-              <h4 className="text-sm font-medium text-ink-50">{step.title}</h4>
+              <h4 className="font-display text-sm font-semibold text-ink-50">{step.title}</h4>
             )}
           </div>
           {editing ? (
@@ -291,7 +394,7 @@ function ProtocolView({
           {step.critical_parameters.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {step.critical_parameters.map((cp, j) => (
-                <span key={j} className="pill border-accent-500/30 bg-accent-500/10 text-accent-200">
+                <span key={j} className="pill border-violet-400/30 bg-violet-500/10 text-violet-200">
                   {cp}
                 </span>
               ))}
@@ -302,7 +405,7 @@ function ProtocolView({
               Safety: {step.safety_notes.join(" · ")}
             </div>
           )}
-        </li>
+        </motion.li>
       ))}
     </ol>
   );
@@ -318,9 +421,9 @@ function MaterialsView({
   onChange: (patch: Partial<ExperimentPlan>) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-ink-700">
+    <div className="overflow-x-auto rounded-xl border border-white/10">
       <table className="w-full text-sm">
-        <thead className="bg-ink-800/50 text-xs uppercase text-ink-300">
+        <thead className="bg-white/[0.04] text-[10px] uppercase tracking-wider text-ink-300">
           <tr>
             <th className="p-3 text-left">Item</th>
             <th className="p-3 text-left">Supplier</th>
@@ -332,22 +435,28 @@ function MaterialsView({
         </thead>
         <tbody>
           {plan.materials.map((m, i) => (
-            <tr key={i} className="border-t border-ink-700">
+            <motion.tr
+              key={i}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.025 * i, duration: 0.3 }}
+              className="border-t border-white/10 transition hover:bg-white/[0.03]"
+            >
               <td className="p-3">
                 <div className="font-medium text-ink-50">{m.name}</div>
                 <div className="text-xs text-ink-400">{m.category}</div>
               </td>
-              <td className="p-3">{m.supplier}</td>
+              <td className="p-3 text-ink-200">{m.supplier}</td>
               <td className="p-3 font-mono text-xs">
                 {m.url ? (
-                  <a className="text-accent-300 hover:underline" target="_blank" rel="noreferrer" href={m.url}>
+                  <a className="text-cyan-300 underline-offset-2 hover:underline" target="_blank" rel="noreferrer" href={m.url}>
                     {m.catalog_number}
                   </a>
                 ) : (
                   m.catalog_number ?? "—"
                 )}
               </td>
-              <td className="p-3">
+              <td className="p-3 text-ink-200">
                 {editing ? (
                   <input
                     className="input"
@@ -362,9 +471,9 @@ function MaterialsView({
                   m.quantity
                 )}
               </td>
-              <td className="p-3 text-right">{fmtUSD(m.unit_cost_usd)}</td>
-              <td className="p-3 text-right font-medium">{fmtUSD(m.total_cost_usd)}</td>
-            </tr>
+              <td className="p-3 text-right tabular-nums text-ink-200">{fmtUSD(m.unit_cost_usd)}</td>
+              <td className="p-3 text-right font-medium tabular-nums text-ink-50">{fmtUSD(m.total_cost_usd)}</td>
+            </motion.tr>
           ))}
         </tbody>
       </table>
@@ -385,27 +494,41 @@ function BudgetView({
       <div className="flex items-end justify-between">
         <div>
           <div className="label">Total budget</div>
-          <div className="text-3xl font-semibold text-ink-50">{fmtUSD(plan.budget.total_usd)}</div>
+          <div className="font-display text-4xl font-semibold tracking-tight text-gradient-accent">
+            <AnimatedNumber value={plan.budget.total_usd} format={(n) => fmtUSD(Math.round(n))} />
+          </div>
         </div>
         <div className="text-sm text-ink-300">+{plan.budget.contingency_pct}% contingency</div>
       </div>
       <div className="space-y-2">
         {plan.budget.lines.map((l, i) => (
-          <div key={i} className="rounded-xl border border-ink-700 p-3">
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.04 * i, duration: 0.35 }}
+            className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+          >
             <div className="flex items-center justify-between text-sm">
-              <div>
+              <div className="min-w-0">
                 <span className="font-medium">{l.category}</span>
                 <span className="ml-2 text-ink-300">{l.description}</span>
               </div>
-              <div className="font-mono">{fmtUSD(l.cost_usd)}</div>
+              <div className="font-mono tabular-nums">{fmtUSD(l.cost_usd)}</div>
             </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
-              <div
-                className="h-full rounded-full bg-accent-500"
-                style={{ width: `${(l.cost_usd / max) * 100}%` }}
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${(l.cost_usd / max) * 100}%` }}
+                transition={{ delay: 0.06 * i + 0.1, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="h-full rounded-full"
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(139,92,246,0.95), rgba(34,211,238,0.95))",
+                }}
               />
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -417,7 +540,7 @@ function TimelineView({ plan }: { plan: ExperimentPlan }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2 text-sm text-ink-300">
-        <CalendarRange className="h-4 w-4" />
+        <CalendarRange className="h-4 w-4 text-cyan-300" />
         {total} weeks · {plan.timeline.phases.length} phases
       </div>
       <div className="space-y-2">
@@ -425,7 +548,13 @@ function TimelineView({ plan }: { plan: ExperimentPlan }) {
           const left = ((p.start_week - 1) / total) * 100;
           const width = ((p.end_week - p.start_week + 1) / total) * 100;
           return (
-            <div key={i} className="rounded-xl border border-ink-700 p-3">
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i, duration: 0.4 }}
+              className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+            >
               <div className="flex items-center justify-between text-sm">
                 <div>
                   <span className="font-medium">{p.name}</span>
@@ -437,16 +566,25 @@ function TimelineView({ plan }: { plan: ExperimentPlan }) {
                   <div className="text-xs text-ink-400">→ depends: {p.depends_on.join(", ")}</div>
                 )}
               </div>
-              <div className="relative mt-2 h-2 w-full rounded-full bg-ink-800">
-                <div
-                  className="absolute h-2 rounded-full bg-gradient-to-r from-accent-500 to-accent-300"
-                  style={{ left: `${left}%`, width: `${width}%` }}
+              <div className="relative mt-2 h-2 w-full rounded-full bg-white/[0.05]">
+                <motion.div
+                  initial={{ left: `${left}%`, width: 0 }}
+                  animate={{ left: `${left}%`, width: `${width}%` }}
+                  transition={{ delay: 0.08 * i + 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute h-2 rounded-full"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, rgba(139,92,246,0.95), rgba(34,211,238,0.95), rgba(45,212,191,0.95))",
+                    boxShadow: "0 0 18px rgba(139,92,246,0.45)",
+                  }}
                 />
               </div>
               {p.deliverables.length > 0 && (
-                <div className="mt-2 text-xs text-ink-300">Deliverables: {p.deliverables.join(" · ")}</div>
+                <div className="mt-2 text-xs text-ink-300">
+                  Deliverables: {p.deliverables.join(" · ")}
+                </div>
               )}
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -458,18 +596,27 @@ function ValidationView({ plan }: { plan: ExperimentPlan }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {plan.validation.map((v, i) => (
-        <div key={i} className="rounded-xl border border-ink-700 p-4">
-          <div className="text-sm font-medium text-ink-50">{v.name}</div>
-          <div className="mt-1 text-xs text-ink-400">{v.measurement}</div>
-          <div className="mt-2 text-sm">
-            <span className="text-emerald-300">Success:</span> {v.success_threshold}
-          </div>
-          <div className="text-sm">
-            <span className="text-rose-300">Failure:</span> {v.failure_mode}
-          </div>
-          {v.statistical_test && <div className="mt-1 text-xs text-ink-300">Stats: {v.statistical_test}</div>}
-          {v.sample_size && <div className="text-xs text-ink-300">N: {v.sample_size}</div>}
-        </div>
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 * i, duration: 0.35 }}
+        >
+          <Spotlight className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="font-display text-sm font-semibold text-ink-50">{v.name}</div>
+            <div className="mt-1 text-xs text-ink-400">{v.measurement}</div>
+            <div className="mt-2 text-sm">
+              <span className="text-emerald-300">✓ Success:</span> {v.success_threshold}
+            </div>
+            <div className="text-sm">
+              <span className="text-rose-300">× Failure:</span> {v.failure_mode}
+            </div>
+            {v.statistical_test && (
+              <div className="mt-1 text-xs text-ink-300">Stats: {v.statistical_test}</div>
+            )}
+            {v.sample_size && <div className="text-xs text-ink-300">N: {v.sample_size}</div>}
+          </Spotlight>
+        </motion.div>
       ))}
     </div>
   );
@@ -479,9 +626,15 @@ function PersonnelView({ plan }: { plan: ExperimentPlan }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {plan.personnel.map((p, i) => (
-        <div key={i} className="rounded-xl border border-ink-700 p-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{p.role}</span>
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 * i, duration: 0.35 }}
+          className="rounded-xl border border-white/10 bg-white/[0.02] p-4"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-display text-sm font-semibold">{p.role}</span>
             <span className="pill">{p.fte} FTE</span>
             <span className="pill">{p.weeks} weeks</span>
           </div>
@@ -490,24 +643,36 @@ function PersonnelView({ plan }: { plan: ExperimentPlan }) {
               <li key={j}>{r}</li>
             ))}
           </ul>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
 }
 
 function RisksView({ plan }: { plan: ExperimentPlan }) {
+  const tone = (lvl: "low" | "medium" | "high") =>
+    lvl === "high"
+      ? "border-rose-400/40 bg-rose-400/10 text-rose-200"
+      : lvl === "medium"
+      ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+      : "border-emerald-400/40 bg-emerald-400/10 text-emerald-200";
   return (
     <div className="space-y-3">
       {plan.risks.map((r, i) => (
-        <div key={i} className="rounded-xl border border-ink-700 p-4">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="pill">L: {r.likelihood}</span>
-            <span className="pill">I: {r.impact}</span>
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 * i, duration: 0.35 }}
+          className="rounded-xl border border-white/10 bg-white/[0.02] p-4"
+        >
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={cn("pill", tone(r.likelihood))}>L: {r.likelihood}</span>
+            <span className={cn("pill", tone(r.impact))}>I: {r.impact}</span>
             <span className="font-medium">{r.risk}</span>
           </div>
           <div className="mt-2 text-sm text-ink-200">Mitigation: {r.mitigation}</div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -517,9 +682,15 @@ function WhyView({ plan }: { plan: ExperimentPlan }) {
   return (
     <ul className="space-y-2">
       {plan.why_this_plan.map((w, i) => (
-        <li key={i} className="rounded-xl border border-ink-700 p-3 text-sm">
-          <span className="text-accent-300">→</span> {w}
-        </li>
+        <motion.li
+          key={i}
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.05 * i, duration: 0.35 }}
+          className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm"
+        >
+          <span className="mt-0.5 text-violet-300">→</span> {w}
+        </motion.li>
       ))}
     </ul>
   );
@@ -542,9 +713,9 @@ function FeedbackPanel({
   const [done, setDone] = useState(false);
 
   return (
-    <div className="border-t border-ink-700 bg-ink-900/40 p-6">
+    <div className="border-t border-white/10 bg-white/[0.02] p-6">
       <div className="mb-3 flex items-center gap-2">
-        <Pencil className="h-4 w-4 text-accent-300" />
+        <Pencil className="h-4 w-4 text-violet-300" />
         <span className="label">Scientist review — your corrections train the next plan</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -553,11 +724,13 @@ function FeedbackPanel({
           value={section}
           onChange={(e) => setSection(e.target.value as FeedbackEntry["section"])}
         >
-          {(["protocol", "materials", "budget", "timeline", "validation", "controls", "general"] as const).map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
+          {(["protocol", "materials", "budget", "timeline", "validation", "controls", "general"] as const).map(
+            (s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            )
+          )}
         </select>
         <input
           className="input sm:col-span-2"
@@ -579,14 +752,18 @@ function FeedbackPanel({
               key={n}
               type="button"
               onClick={() => setRating(n)}
-              className={cn("rounded p-1", n <= rating ? "text-amber-300" : "text-ink-500")}
+              className={cn(
+                "rounded p-1 transition",
+                n <= rating ? "text-amber-300" : "text-ink-500 hover:text-ink-300"
+              )}
               aria-label={`rate ${n}`}
             >
               <Star className="h-4 w-4 fill-current" />
             </button>
           ))}
         </div>
-        <button
+        <motion.button
+          whileTap={{ scale: 0.97 }}
           className="btn-primary"
           disabled={busy || !correction.trim()}
           onClick={async () => {
@@ -603,6 +780,7 @@ function FeedbackPanel({
               setDone(true);
               setOriginal("");
               setCorrection("");
+              setTimeout(() => setDone(false), 2400);
             } finally {
               setBusy(false);
             }
@@ -610,8 +788,19 @@ function FeedbackPanel({
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Submit feedback
-        </button>
-        {done && <span className="text-xs text-emerald-300">Saved — feedback will guide future plans.</span>}
+        </motion.button>
+        <AnimatePresence>
+          {done && (
+            <motion.span
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="text-xs text-emerald-300"
+            >
+              Saved — feedback will guide future plans.
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
