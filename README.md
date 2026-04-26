@@ -1,12 +1,19 @@
 # The AI Scientist
 
-From a natural-language scientific hypothesis to a runnable, operationally realistic experiment plan — in seconds.
+> From a natural-language scientific hypothesis to a runnable, operationally realistic experiment plan — in seconds.
 
 Built for **Hack-Nation × World Bank Youth Summit · Global AI Hackathon 2026** (Challenge 04 — *The AI Scientist*, Fulcrum Science).
 
-> See **[`PROJECT.md`](./PROJECT.md)** for the full architecture, schema, demo script, and rationale.
+## Two implementations live in this repo
 
-## Quick start
+This repository has **two parallel implementations** of the AI Scientist that were merged together. Pick the one you want to run:
+
+| Path | Description |
+|---|---|
+| **`/` (repo root)** | The primary, demo-ready implementation. Next.js 14 App Router, futuristic redesigned UI with aurora background, glass morphism, gradient text, magnetic submit, animated tab indicator, and counter animations. **This is the one we recommend running.** See [`PROJECT.md`](./PROJECT.md) for the full architecture, schema, demo script, and rationale. |
+| **[`/ai-scientist`](./ai-scientist/)** | The alternate scaffold. Has its own `package.json`, README, and source tree. Useful as a reference. |
+
+## Quick start (primary, at repo root)
 
 ```bash
 npm install
@@ -25,4 +32,4 @@ No API keys yet? Click **Load demo plan** in the header to explore the UI with a
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript · Tailwind · Zod · OpenAI-compatible LLM (works with OpenAI, OpenRouter, Together, Cursor proxy) · Tavily · Semantic Scholar Graph API · Framer Motion · Lucide.
+Next.js 14 (App Router) · TypeScript · Tailwind · Framer Motion · Zod · OpenAI-compatible LLM (works with OpenAI, OpenRouter, Together, Cursor proxy) · Tavily · Semantic Scholar Graph API · Lucide.
