@@ -16,9 +16,11 @@ import { HypothesisInput } from "@/components/HypothesisInput";
 import { NoveltyCard } from "@/components/NoveltyCard";
 import { PlanView } from "@/components/PlanView";
 import { Spotlight } from "@/components/Spotlight";
+import { HypothesisQualityCard } from "@/components/HypothesisQualityCard";
 import type {
   ExperimentPlan,
   FeedbackEntry,
+  HypothesisQuality,
   NoveltyResult,
   ScientificIntent,
   StoredPlan,
@@ -41,6 +43,58 @@ export default function Page() {
   const [regenBusy, setRegenBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Hypothesis pre-flight check (debounced)
+  const [hypoText, setHypoText] = useState<string>("");
+  const [hypoQuality, setHypoQuality] = useState<HypothesisQuality | null>(null);
+  const [hypoRewriteBusy, setHypoRewriteBusy] = useState(false);
+  const [appliedRewrite, setAppliedRewrite] = useState<string | undefined>();
+
+  useEffect(() => {
+    const t = hypoText.trim();
+    if (t.length < 10) {
+      setHypoQuality(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/hypothesis-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hypothesis: t }),
+          signal: ctrl.signal,
+        });
+        if (!r.ok) return;
+        const j = (await r.json()) as { quality: HypothesisQuality };
+        setHypoQuality(j.quality);
+      } catch {
+        /* aborted */
+      }
+    }, 350);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [hypoText]);
+
+  const requestRewrite = useCallback(async () => {
+    if (hypoText.trim().length < 10) return;
+    setHypoRewriteBusy(true);
+    try {
+      const r = await fetch("/api/hypothesis-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hypothesis: hypoText, rewrite: true }),
+      });
+      if (r.ok) {
+        const j = (await r.json()) as { quality: HypothesisQuality };
+        setHypoQuality(j.quality);
+      }
+    } finally {
+      setHypoRewriteBusy(false);
+    }
+  }, [hypoText]);
 
   const run = useCallback(async (hypothesis: string) => {
     abortRef.current?.abort();
@@ -268,7 +322,21 @@ export default function Page() {
           onSubmit={run}
           busy={s.stage === "intent" || s.stage === "novelty" || s.stage === "plan"}
           initial={s.hypothesis}
+          externalValue={appliedRewrite}
+          onChange={setHypoText}
         />
+
+        <AnimatePresence>
+          {hypoQuality && !s.intent && (
+            <HypothesisQualityCard
+              key="hquality"
+              quality={hypoQuality}
+              loadingRewrite={hypoRewriteBusy}
+              onRequestRewrite={requestRewrite}
+              onApplyImproved={(v) => setAppliedRewrite(v)}
+            />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {s.stage === "error" && s.error && (

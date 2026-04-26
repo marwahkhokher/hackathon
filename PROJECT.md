@@ -1,10 +1,24 @@
 # The AI Scientist
 
-> From a natural-language scientific hypothesis to a runnable, operationally realistic experiment plan — in seconds.
+> From a natural-language scientific hypothesis to a runnable, operationally realistic experiment plan — in seconds, with a quotable readiness score that tells you if the plan is actually executable on Monday.
 
 Built for the **Hack-Nation × World Bank Youth Summit · Global AI Hackathon 2026**, challenge **#04 — The AI Scientist** (Fulcrum Science).
 
 ---
+
+## 0 · Headline differentiators (the judge hooks)
+
+These five features are what make this read as a real product, not a hackathon prototype.
+
+1. **🏆 Monday Readiness Score (0–100).** A composite, deterministic score with four transparent sub-scores (Protocol Clarity, Materials Availability, Budget Realism, Timeline Feasibility) rendered as an animated radial gauge. *"Our tool doesn't just generate a plan — it tells you if the plan is actually executable on Monday."* See `src/lib/readinessScore.ts` and `src/components/ReadinessGauge.tsx`.
+
+2. **🔬 Protocol Grounding Transparency.** Every protocol step shows inline **citation chips** (📄 protocols.io / DOI / Bio-protocol / JOVE / OpenWetWare) linking to the actual source. The plan prompt explicitly instructs the model to ground each step. See `ProtocolStepSchema.citations` and `CitationChip` in `src/components/PlanView.tsx`.
+
+3. **📊 Hypothesis Quality Analyzer.** A debounced **pre-flight check** runs as the user types the hypothesis. Four deterministic regex-driven checks (intervention named · measurable threshold · mechanistic reason · control implied) with an LLM-generated rewrite suggestion if the score is < 85. See `src/lib/hypothesisQuality.ts`, `/api/hypothesis-check`, and `HypothesisQualityCard`.
+
+4. **📦 One-Click Materials Export.** A **Download order sheet (.csv)** button on the Materials tab emits a CSV in Sigma-Aldrich's bulk-upload column shape (Catalog#, Quantity, Unit, Description, Supplier, …) — drops straight into a CRO procurement portal. See `src/lib/csvExport.ts`.
+
+5. **🧠 Alternatives Panel.** A collapsible **Compare approaches** section that surfaces 2 sibling methodologies with a cost / timeline / P(success) tradeoff table, plus pros & cons cards. The plan prompt asks the LLM to populate this; the seed plan demonstrates two real alternatives (Glycerol vs. intracellular trehalose loading). See `AlternativeApproachSchema` and `src/components/AlternativesPanel.tsx`.
 
 ## 1 · The pitch
 

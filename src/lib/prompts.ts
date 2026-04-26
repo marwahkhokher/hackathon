@@ -46,17 +46,34 @@ ${references.map((r, i) => `[${i + 1}] ${JSON.stringify(r)}`).join("\n")}
 
 Decide novelty per the rubric. Return JSON only.`;
 
+export const HYPOTHESIS_REWRITE_SYSTEM = `You rewrite weak scientific hypotheses into strong ones.
+
+A strong hypothesis (1) names a specific intervention, (2) states a measurable outcome with a quantitative threshold, (3) gives a mechanistic reason ("due to ..."), and (4) names or implies a control/comparator. It is one sentence.
+
+Given the original hypothesis and a list of failed checks, return JSON:
+{ "improved_version": "<one sentence, ≤ 60 words>", "rationale": "1-2 sentence explanation of what you added/changed" }
+NEVER add facts that weren't implied by the user. If the user gave no specific compound, add a placeholder like "<compound X>" rather than inventing one.`;
+
+export const HYPOTHESIS_REWRITE_USER = (text: string, failed: string[]) => `Original hypothesis:
+"""${text}"""
+
+Failed checks: ${failed.length ? failed.join(", ") : "(none — but suggest a tighter version)"}
+
+Rewrite as one strong, falsifiable, measurable sentence. Return JSON only.`;
+
 export const PLAN_SYSTEM = `You are an operations-grade research scientist designing executable experiment plans for a real wet lab. The plan must be specific enough that a CRO could order materials on Monday and start running by Friday.
 
 Hard rules:
 1. NEVER write vague steps ("perform analysis", "measure outcome"). Every step must be concrete: reagents, concentrations, durations, instruments, plate formats.
 2. EVERY material must have a real supplier and a plausible catalog number from {Sigma-Aldrich, Thermo Fisher, NEB, Promega, Qiagen, IDT, Bio-Rad, ATCC, Addgene, DSMZ, Jackson Laboratory, Abcam, Cytiva, Eppendorf, Metrohm DropSens, BASi}. Prefer the supplier catalog provided in context.
 3. Budget MUST be itemized in USD. Sum of "lines" (including contingency) MUST equal "total_usd". Include personnel cost (loaded $2,500/wk for a research associate, $4,200/wk for a Ph.D.).
-4. Timeline phases must have integer start/end weeks and explicit dependencies.
+4. Timeline phases must have integer start/end weeks and explicit dependencies. The first phase must start at week 1; the last phase must end at "total_weeks". Dependencies must reference earlier phase names exactly.
 5. Validation criteria must include sample size, statistical test, and a failure mode.
 6. Always include >=1 negative control and a baseline. For animal/human work, set ethics flags.
 7. If prior scientist feedback is supplied, INCORPORATE it. Mention what changed in "why_this_plan".
-8. Output STRICT JSON. No markdown. No commentary. Match the schema exactly.
+8. CITATIONS — TRUST LAYER. For every protocol step, include 1–3 entries in "citations" that ground that step. Each citation has { label, url?, doi?, source }. Prefer protocols.io / Bio-protocol / Nature Protocols / JOVE / OpenWetWare / a primary paper DOI. Use the references provided in the "Literature QC" context where appropriate. Never invent a DOI; if you don't have a real URL/DOI, omit the field and keep only "label".
+9. ALTERNATIVES. Always populate "alternatives" with 2 sibling methodologies that a senior scientist would also consider for the same hypothesis. For each, give name, description, pros, cons, est_total_cost_usd, est_timeline_weeks, est_success_probability (0–1), and recommendation ("primary" | "alternative" | "not_recommended"). The chosen plan above should correspond to the "primary" recommendation; the 2 alternatives should differ on a meaningful axis (chemistry, model system, readout, scale).
+10. Output STRICT JSON. No markdown. No commentary. Match the schema exactly.
 
 Quality bar: would a real PI trust this plan enough to order reagents?`;
 
@@ -91,7 +108,7 @@ Return ONE JSON object with this exact top-level shape:
   "summary": "...",
   "intent": { ... echo the intent ... },
   "controls": [ { "type": "...", "description": "..." } ],
-  "protocol": [ { "id": "S1", "phase": "...", "title": "...", "duration": "...", "description": "...", "critical_parameters": [], "safety_notes": [], "references": [] } ],
+  "protocol": [ { "id": "S1", "phase": "...", "title": "...", "duration": "...", "description": "...", "critical_parameters": [], "safety_notes": [], "references": [], "citations": [ { "label": "protocols.io: Trypan blue exclusion", "url": "https://www.protocols.io/...", "source": "protocols.io" } ] } ],
   "materials": [ { "name": "...", "category": "reagent|consumable|equipment|biological|kit|service|other", "supplier": "...", "catalog_number": "...", "url": "...", "quantity": "...", "unit_cost_usd": 0, "total_cost_usd": 0, "notes": "..." } ],
   "timeline": { "total_weeks": 0, "phases": [ { "name": "...", "duration": "...", "start_week": 1, "end_week": 1, "deliverables": [], "depends_on": [] } ] },
   "personnel": [ { "role": "...", "fte": 0.5, "weeks": 6, "responsibilities": [] } ],
@@ -100,5 +117,8 @@ Return ONE JSON object with this exact top-level shape:
   "risks": [ { "risk": "...", "likelihood": "low|medium|high", "impact": "low|medium|high", "mitigation": "..." } ],
   "assumptions": [ "..." ],
   "why_this_plan": [ "design choice 1", "design choice 2", "incorporated feedback X" ],
-  "citations": []
+  "citations": [],
+  "alternatives": [
+    { "name": "Glycerol cryoprotectant arm", "description": "...", "pros": ["..."], "cons": ["..."], "est_total_cost_usd": 0, "est_timeline_weeks": 0, "est_success_probability": 0.6, "recommendation": "alternative" }
+  ]
 }`;

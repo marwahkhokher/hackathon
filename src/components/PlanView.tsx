@@ -17,11 +17,17 @@ import {
   Loader2,
   RefreshCcw,
   X,
+  Download,
+  ExternalLink,
 } from "lucide-react";
-import type { ExperimentPlan, FeedbackEntry, StoredPlan } from "@/lib/schemas";
+import type { ExperimentPlan, FeedbackEntry, ProtocolCitation, StoredPlan } from "@/lib/schemas";
 import { cn, fmtUSD } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { Spotlight } from "./Spotlight";
+import { ReadinessGauge } from "./ReadinessGauge";
+import { AlternativesPanel } from "./AlternativesPanel";
+import { computeReadiness } from "@/lib/readinessScore";
+import { materialsToOrderSheetCsv } from "@/lib/csvExport";
 
 type Section =
   | "summary"
@@ -71,6 +77,7 @@ export function PlanView({
     () => plan.materials.reduce((s, m) => s + (m.total_cost_usd || 0), 0),
     [plan.materials]
   );
+  const readiness = useMemo(() => computeReadiness(plan), [plan]);
 
   return (
     <motion.div
@@ -182,6 +189,11 @@ export function PlanView({
         />
       </div>
 
+      {/* Monday Readiness Score — headline feature */}
+      <div className="border-b border-white/10 px-6 py-5">
+        <ReadinessGauge score={readiness} />
+      </div>
+
       {/* tabs */}
       <LayoutGroup id="plan-tabs">
         <div className="flex gap-1 overflow-x-auto border-b border-white/10 px-2">
@@ -238,6 +250,7 @@ export function PlanView({
             {tab === "materials" && (
               <MaterialsView
                 plan={plan}
+                hypothesis={stored.hypothesis}
                 editing={editing}
                 onChange={(p) => setDraft({ ...draft, ...p })}
               />
@@ -253,6 +266,13 @@ export function PlanView({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Alternatives — collapsible senior-scientist comparison */}
+      {plan.alternatives && plan.alternatives.length > 0 && (
+        <div className="border-t border-white/10 p-6">
+          <AlternativesPanel plan={plan} />
+        </div>
+      )}
 
       <FeedbackPanel
         defaultSection={
@@ -400,6 +420,16 @@ function ProtocolView({
               ))}
             </div>
           )}
+          {step.citations && step.citations.length > 0 && (
+            <div className="mt-3">
+              <div className="label mb-1.5">Grounded in</div>
+              <div className="flex flex-wrap gap-1.5">
+                {step.citations.map((c, j) => (
+                  <CitationChip key={j} c={c} />
+                ))}
+              </div>
+            </div>
+          )}
           {step.safety_notes.length > 0 && (
             <div className="mt-2 text-xs text-amber-300">
               Safety: {step.safety_notes.join(" · ")}
@@ -411,18 +441,93 @@ function ProtocolView({
   );
 }
 
+function CitationChip({ c }: { c: ProtocolCitation }) {
+  const href = c.url ?? (c.doi ? `https://doi.org/${c.doi}` : undefined);
+  const Inner = (
+    <span className="pill border-cyan-400/30 bg-cyan-400/10 text-cyan-200 transition hover:border-cyan-400/60 hover:text-cyan-100">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-cyan-300">
+        {sourceShortLabel(c.source)}
+      </span>
+      <span className="max-w-[18rem] truncate">{c.label}</span>
+      {href && <ExternalLink className="h-3 w-3 opacity-70" />}
+    </span>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noreferrer" className="inline-flex">
+      {Inner}
+    </a>
+  ) : (
+    Inner
+  );
+}
+
+function sourceShortLabel(s: ProtocolCitation["source"]): string {
+  switch (s) {
+    case "protocols.io":
+      return "protocols.io";
+    case "bio-protocol":
+      return "bio-protocol";
+    case "nature_protocols":
+      return "Nature Prot.";
+    case "jove":
+      return "JOVE";
+    case "openwetware":
+      return "OWW";
+    case "pubmed":
+      return "PubMed";
+    case "doi":
+      return "DOI";
+    default:
+      return "ref";
+  }
+}
+
 function MaterialsView({
   plan,
   editing,
   onChange,
+  hypothesis,
 }: {
   plan: ExperimentPlan;
   editing: boolean;
   onChange: (patch: Partial<ExperimentPlan>) => void;
+  hypothesis?: string;
 }) {
+  const handleDownload = () => {
+    const csv = materialsToOrderSheetCsv(plan.materials, hypothesis ?? plan.intent.hypothesis_restated);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const slug = plan.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 60);
+    a.download = `${slug || "ai-scientist"}-order-sheet.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className="w-full text-sm">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-ink-400">
+          Sigma-Aldrich bulk-upload compatible — drops straight into a procurement portal.
+        </div>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={handleDownload}
+          className="btn-primary"
+        >
+          <Download className="h-4 w-4" /> Download order sheet (.csv)
+        </motion.button>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full text-sm">
         <thead className="bg-white/[0.04] text-[10px] uppercase tracking-wider text-ink-300">
           <tr>
             <th className="p-3 text-left">Item</th>
@@ -477,6 +582,7 @@ function MaterialsView({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

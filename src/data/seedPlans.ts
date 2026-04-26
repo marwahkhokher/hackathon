@@ -60,6 +60,18 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Confluence 70–80% at harvest", "Mycoplasma-negative", "Passage P12–P15"],
         safety_notes: ["BSL-2", "Use class II BSC"],
         references: ["ATCC CCL-2 datasheet"],
+        citations: [
+          {
+            label: "ATCC CCL-2 (HeLa) culture protocol",
+            url: "https://www.atcc.org/products/ccl-2",
+            source: "other",
+          },
+          {
+            label: "MycoAlert mycoplasma detection (Lonza technical manual)",
+            url: "https://www.lonza.com/products-services/bio-research/cell-culture-products/mycoplasma-detection",
+            source: "other",
+          },
+        ],
       },
       {
         id: "S2",
@@ -71,6 +83,18 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Osmolality verified", "Sterile-filtered", "Pre-chilled to 4 °C"],
         safety_notes: ["DMSO is a skin penetrant — wear nitrile gloves"],
         references: ["protocols.io: Cryopreservation of mammalian cells"],
+        citations: [
+          {
+            label: "protocols.io: Cryopreservation of adherent mammalian cells",
+            url: "https://www.protocols.io/view/cryopreservation-of-adherent-mammalian-cells",
+            source: "protocols.io",
+          },
+          {
+            label: "Crowe LM, Crowe JH — Trehalose membrane stabilization (Cryobiology, 1992)",
+            doi: "10.1016/0011-2240(92)90033-X",
+            source: "doi",
+          },
+        ],
       },
       {
         id: "S3",
@@ -82,6 +106,18 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Cell density 1×10⁶/mL", "Cooling rate −1 °C/min", "≤30 min total handling time"],
         safety_notes: ["Cryogenic gloves", "Face shield when handling LN₂"],
         references: ["Pegg DE, Methods Mol Biol 2007"],
+        citations: [
+          {
+            label: "Pegg DE — Principles of Cryopreservation (Methods Mol Biol, 2007)",
+            doi: "10.1007/978-1-59745-362-2_3",
+            source: "doi",
+          },
+          {
+            label: "Bio-protocol: Slow-rate cryopreservation of mammalian cells",
+            url: "https://bio-protocol.org/en/bpdetail",
+            source: "bio-protocol",
+          },
+        ],
       },
       {
         id: "S4",
@@ -93,6 +129,7 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Temp log < −150 °C"],
         safety_notes: [],
         references: [],
+        citations: [],
       },
       {
         id: "S5",
@@ -104,6 +141,18 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Thaw time ≤90 s", "Drop-wise dilution to limit osmotic shock"],
         safety_notes: ["BSL-2"],
         references: ["protocols.io: Trypan blue exclusion assay"],
+        citations: [
+          {
+            label: "protocols.io: Trypan blue exclusion viability assay",
+            url: "https://www.protocols.io/view/trypan-blue-exclusion-assay",
+            source: "protocols.io",
+          },
+          {
+            label: "Strober W — Trypan blue exclusion (Curr Protoc Immunol)",
+            doi: "10.1002/0471142735.ima03bs111",
+            source: "doi",
+          },
+        ],
       },
       {
         id: "S6",
@@ -115,6 +164,13 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Imaging interval ≤4 h"],
         safety_notes: [],
         references: [],
+        citations: [
+          {
+            label: "JOVE: Quantification of Mammalian Cell Growth Kinetics",
+            url: "https://www.jove.com/v/2350",
+            source: "jove",
+          },
+        ],
       },
       {
         id: "S7",
@@ -126,6 +182,13 @@ export const SEED_PLANS: ExperimentPlan[] = [
         critical_parameters: ["Pre-registered analysis plan", "Blinded counting"],
         safety_notes: [],
         references: ["MIQE-style reporting standards"],
+        citations: [
+          {
+            label: "Bustin SA et al. — MIQE guidelines (Clin Chem, 2009)",
+            doi: "10.1373/clinchem.2008.112797",
+            source: "doi",
+          },
+        ],
       },
     ],
     materials: [
@@ -192,6 +255,42 @@ export const SEED_PLANS: ExperimentPlan[] = [
       "Mycoplasma QC pre-registered to avoid the most common confounder in published cryopreservation studies.",
     ],
     citations: [],
+    alternatives: [
+      {
+        name: "Glycerol-based freezing medium",
+        description:
+          "Replace DMSO with 10% glycerol + 0.3 M trehalose. Less cytotoxic than DMSO at warm temperatures and well-characterized for adherent cell lines, but typically gives lower post-thaw viability than optimized DMSO formulations.",
+        pros: [
+          "No DMSO handling — safer and cheaper at scale",
+          "Established in stem cell and ATMP workflows",
+        ],
+        cons: [
+          "~5–10 pp lower viability vs DMSO controls in published HeLa data",
+          "Glycerol is more viscous → slightly trickier handling at 1 mL aliquots",
+        ],
+        est_total_cost_usd: 7800,
+        est_timeline_weeks: 6,
+        est_success_probability: 0.55,
+        recommendation: "alternative",
+      },
+      {
+        name: "Intracellular trehalose loading via electroporation",
+        description:
+          "Pre-load trehalose into HeLa via electroporation before freezing in 5% DMSO. Higher mechanistic specificity (tests trehalose-as-intracellular-stabilizer rather than extracellular osmolyte) but adds an electroporation step and reduces baseline viability before freezing.",
+        pros: [
+          "Tests the cytoplasmic-stabilization hypothesis directly",
+          "Published literature supports superior recovery in some cell types",
+        ],
+        cons: [
+          "Electroporation alone causes ~20% acute cell loss",
+          "Requires Lonza Nucleofector or equivalent ($25k+ instrument)",
+        ],
+        est_total_cost_usd: 14500,
+        est_timeline_weeks: 8,
+        est_success_probability: 0.45,
+        recommendation: "alternative",
+      },
+    ],
   },
 ];
 

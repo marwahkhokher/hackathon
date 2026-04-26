@@ -5,6 +5,10 @@ import { ArrowRight, Sparkles, Beaker, Wand2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+export interface HypothesisInputHandle {
+  setValue: (v: string) => void;
+}
+
 const SAMPLES: { label: string; value: string; tag: string }[] = [
   {
     label: "Diagnostics — paper electrochemical biosensor for CRP",
@@ -44,12 +48,29 @@ export function HypothesisInput({
   onSubmit,
   busy,
   initial,
+  externalValue,
+  onChange,
 }: {
   onSubmit: (h: string) => void;
   busy: boolean;
   initial?: string;
+  /** When this changes, the textarea is updated (used by the rewrite suggestion). */
+  externalValue?: string;
+  /** Called with the latest text on every change. */
+  onChange?: (v: string) => void;
 }) {
-  const [value, setValue] = useState<string>(initial ?? "");
+  const [value, setValueState] = useState<string>(initial ?? "");
+  const setValue = (v: string) => {
+    setValueState(v);
+    onChange?.(v);
+  };
+  useEffect(() => {
+    if (externalValue != null && externalValue !== value) {
+      setValueState(externalValue);
+      onChange?.(externalValue);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalValue]);
   const [placeholder, setPlaceholder] = useState<string>("");
   const [phIdx, setPhIdx] = useState(0);
   const btnRef = useRef<HTMLButtonElement | null>(null);

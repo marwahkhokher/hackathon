@@ -97,6 +97,16 @@ export const MaterialSchema = z.object({
 });
 export type Material = z.infer<typeof MaterialSchema>;
 
+export const ProtocolCitationSchema = z.object({
+  label: z.string(), // e.g. "protocols.io: Trypan blue assay"
+  url: z.string().url().optional(),
+  doi: z.string().optional(),
+  source: z
+    .enum(["protocols.io", "bio-protocol", "nature_protocols", "jove", "openwetware", "pubmed", "doi", "other"])
+    .default("other"),
+});
+export type ProtocolCitation = z.infer<typeof ProtocolCitationSchema>;
+
 export const ProtocolStepSchema = z.object({
   id: z.string(),
   phase: z.string(),
@@ -106,6 +116,7 @@ export const ProtocolStepSchema = z.object({
   critical_parameters: z.array(z.string()).default([]),
   safety_notes: z.array(z.string()).default([]),
   references: z.array(z.string()).default([]),
+  citations: z.array(ProtocolCitationSchema).default([]),
 });
 export type ProtocolStep = z.infer<typeof ProtocolStepSchema>;
 
@@ -144,6 +155,18 @@ export const PersonnelRoleSchema = z.object({
 });
 export type PersonnelRole = z.infer<typeof PersonnelRoleSchema>;
 
+export const AlternativeApproachSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  pros: z.array(z.string()),
+  cons: z.array(z.string()),
+  est_total_cost_usd: z.number().nonnegative(),
+  est_timeline_weeks: z.number().positive(),
+  est_success_probability: z.number().min(0).max(1).optional(),
+  recommendation: z.enum(["primary", "alternative", "not_recommended"]).default("alternative"),
+});
+export type AlternativeApproach = z.infer<typeof AlternativeApproachSchema>;
+
 export const ExperimentPlanSchema = z.object({
   title: z.string(),
   summary: z.string(),
@@ -179,6 +202,7 @@ export const ExperimentPlanSchema = z.object({
   assumptions: z.array(z.string()),
   why_this_plan: z.array(z.string()),
   citations: z.array(ReferenceSchema).default([]),
+  alternatives: z.array(AlternativeApproachSchema).default([]),
 });
 export type ExperimentPlan = z.infer<typeof ExperimentPlanSchema>;
 
@@ -207,6 +231,35 @@ export const FeedbackEntrySchema = z.object({
   created_at: z.string(),
 });
 export type FeedbackEntry = z.infer<typeof FeedbackEntrySchema>;
+
+// ===========================================================
+// Hypothesis pre-flight quality check
+// ===========================================================
+
+export const HypothesisCheckIdSchema = z.enum([
+  "intervention",
+  "outcome_threshold",
+  "mechanism",
+  "control",
+]);
+export type HypothesisCheckId = z.infer<typeof HypothesisCheckIdSchema>;
+
+export const HypothesisCheckSchema = z.object({
+  id: HypothesisCheckIdSchema,
+  label: z.string(),
+  status: z.enum(["pass", "warn", "fail"]),
+  evidence: z.string(),
+  hint: z.string().optional(),
+});
+export type HypothesisCheckResult = z.infer<typeof HypothesisCheckSchema>;
+
+export const HypothesisQualitySchema = z.object({
+  score: z.number().min(0).max(100),
+  checks: z.array(HypothesisCheckSchema),
+  improved_version: z.string().optional(),
+  rationale: z.string().optional(),
+});
+export type HypothesisQuality = z.infer<typeof HypothesisQualitySchema>;
 
 export const StoredPlanSchema = z.object({
   id: z.string(),
